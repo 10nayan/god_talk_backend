@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Text, DateTime
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Text, DateTime, JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -24,6 +24,9 @@ class God(Base):
     name = Column(String, unique=True, index=True)
     description = Column(Text)
     system_prompt = Column(Text)
+    example_phrases = Column(JSON)
+    interaction_style = Column(String)
+    personality_traits = Column(JSON)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     # Relationships

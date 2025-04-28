@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, EmailStr
 from datetime import datetime
 
@@ -31,6 +31,9 @@ class GodBase(BaseModel):
     name: str
     description: str
     system_prompt: str
+    example_phrases: Optional[List[str]] = None
+    interaction_style: Optional[str] = None
+    personality_traits: Optional[List[str]] = None
 
 class GodCreate(GodBase):
     pass
@@ -77,7 +80,7 @@ class Conversation(ConversationBase):
     class Config:
         orm_mode = True
 
-# Chat request/response schemas
+# Chat schemas
 class ChatRequest(BaseModel):
     conversation_id: int
     message: str

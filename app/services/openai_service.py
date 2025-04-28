@@ -1,9 +1,11 @@
 from openai import AsyncOpenAI
 from typing import List, Dict, Any
+import httpx
 from app.config import settings
 
-# Initialize the OpenAI client
-client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+# Initialize the OpenAI client with a custom HTTP client
+http_client = httpx.AsyncClient()
+client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY, http_client=http_client)
 
 class OpenAIService:
     @staticmethod

@@ -3,7 +3,8 @@ from sqlalchemy.orm import Session
 from app.database import SessionLocal, engine, Base
 from app.models import God
 
-# Create tables
+# Drop all tables and recreate them
+Base.metadata.drop_all(bind=engine)
 Base.metadata.create_all(bind=engine)
 
 # Predefined gods with their system prompts

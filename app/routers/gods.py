@@ -30,7 +30,10 @@ async def create_god(
     db_god = God(
         name=god.name,
         description=god.description,
-        system_prompt=god.system_prompt
+        system_prompt=god.system_prompt,
+        example_phrases=god.example_phrases,
+        interaction_style=god.interaction_style,
+        personality_traits=god.personality_traits
     )
     db.add(db_god)
     db.commit()
@@ -53,10 +56,10 @@ async def get_god(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    db_god = db.query(God).filter(God.id == god_id).first()
-    if db_god is None:
+    god = db.query(God).filter(God.id == god_id).first()
+    if god is None:
         raise HTTPException(status_code=404, detail="God not found")
-    return db_god
+    return god
 
 @router.put("/{god_id}", response_model=GodSchema)
 async def update_god(
@@ -70,9 +73,8 @@ async def update_god(
         raise HTTPException(status_code=404, detail="God not found")
     
     # Update god attributes
-    db_god.name = god.name
-    db_god.description = god.description
-    db_god.system_prompt = god.system_prompt
+    for key, value in god.dict().items():
+        setattr(db_god, key, value)
     
     db.commit()
     db.refresh(db_god)
