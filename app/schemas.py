@@ -34,6 +34,8 @@ class GodBase(BaseModel):
     example_phrases: Optional[List[str]] = None
     interaction_style: Optional[str] = None
     personality_traits: Optional[List[str]] = None
+    image_url: Optional[str] = None
+    religion: str
 
 class GodCreate(GodBase):
     pass

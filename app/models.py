@@ -27,6 +27,8 @@ class God(Base):
     example_phrases = Column(JSON)
     interaction_style = Column(String)
     personality_traits = Column(JSON)
+    image_url = Column(String, nullable=True)
+    religion = Column(String, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     # Relationships

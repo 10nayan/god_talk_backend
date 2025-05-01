@@ -33,7 +33,8 @@ async def create_god(
         system_prompt=god.system_prompt,
         example_phrases=god.example_phrases,
         interaction_style=god.interaction_style,
-        personality_traits=god.personality_traits
+        personality_traits=god.personality_traits,
+        image_url=god.image_url
     )
     db.add(db_god)
     db.commit()
