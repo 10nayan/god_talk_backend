@@ -2,13 +2,14 @@ import asyncio
 import argparse
 import requests
 from getpass import getpass
+import os
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
 
-# API base URL
-BASE_URL = "http://localhost:8000"
+# API base URL from environment variable
+BASE_URL = os.getenv("BACKEND_HOST_URL", "http://localhost:8000")
 
 async def chat_with_god(conversation_id, message, username, password):
     """Send a message to a god in a conversation."""
