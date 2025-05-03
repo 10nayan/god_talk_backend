@@ -67,9 +67,19 @@ async def get_conversations(
     db=Depends(get_database),
     current_user=Depends(get_current_active_user)
 ):
+    # Get all conversations for the user
     cursor = db["conversations"].find({"user_id": ObjectId(current_user.id)}).skip(skip).limit(limit)
-    conversations = [conversation_doc_to_schema(doc) async for doc in cursor]
-    return conversations
+    conversations = [doc async for doc in cursor]
+
+    # Filter: Only include conversations that have at least one message
+    filtered_conversations = []
+    for conv in conversations:
+        msg_count = await db["messages"].count_documents({"conversation_id": conv["_id"]})
+        if msg_count > 0:
+            filtered_conversations.append(conv)
+
+    # Convert to schema
+    return [conversation_doc_to_schema(doc) for doc in filtered_conversations]
 
 @router.get("/{conversation_id}", response_model=ConversationSchema)
 async def get_conversation(
