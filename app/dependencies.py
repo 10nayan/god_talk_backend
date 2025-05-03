@@ -1,24 +1,14 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
-from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from typing import Optional
 
-from app.database import SessionLocal
-from app.models import User
-from app.schemas import TokenData
+from app.database import get_database
+from app.schemas import TokenData, User as UserSchema
 from app.config import settings
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-
-# Dependency to get the database session
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
@@ -30,7 +20,19 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
 
-async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+# Helper to convert MongoDB user doc to UserSchema
+def user_doc_to_schema(doc):
+    if not doc:
+        return None
+    return UserSchema(
+        id=str(doc["_id"]),
+        username=doc["username"],
+        email=doc["email"],
+        is_active=doc.get("is_active", True),
+        created_at=doc.get("created_at", datetime.utcnow()),
+    )
+
+async def get_current_user(token: str = Depends(oauth2_scheme), db=Depends(get_database)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -44,12 +46,12 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
         token_data = TokenData(username=username)
     except JWTError:
         raise credentials_exception
-    user = db.query(User).filter(User.username == token_data.username).first()
-    if user is None:
+    user_doc = await db["users"].find_one({"username": token_data.username})
+    if user_doc is None:
         raise credentials_exception
-    return user
+    return user_doc_to_schema(user_doc)
 
-async def get_current_active_user(current_user: User = Depends(get_current_user)):
+async def get_current_active_user(current_user: UserSchema = Depends(get_current_user)):
     if not current_user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user

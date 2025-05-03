@@ -19,7 +19,7 @@ class UserCreate(UserBase):
     password: str
 
 class User(UserBase):
-    id: int
+    id: str
     is_active: bool
     created_at: datetime
 
@@ -41,7 +41,7 @@ class GodCreate(GodBase):
     pass
 
 class God(GodBase):
-    id: int
+    id: str
     created_at: datetime
 
     class Config:
@@ -53,11 +53,11 @@ class MessageBase(BaseModel):
     is_from_user: bool = True
 
 class MessageCreate(MessageBase):
-    conversation_id: int
+    conversation_id: str
 
 class Message(MessageBase):
-    id: int
-    conversation_id: int
+    id: str
+    conversation_id: str
     created_at: datetime
 
     class Config:
@@ -66,27 +66,27 @@ class Message(MessageBase):
 # Conversation schemas
 class ConversationBase(BaseModel):
     title: str
-    god_id: int
+    god_id: str
 
 class ConversationCreate(ConversationBase):
     pass
 
 class Conversation(ConversationBase):
-    id: int
-    user_id: int
+    id: str
+    user_id: str
     created_at: datetime
     updated_at: Optional[datetime] = None
     messages: List[Message] = []
-    god: God
+    god: Optional[God] = None
 
     class Config:
         orm_mode = True
 
 # Chat schemas
 class ChatRequest(BaseModel):
-    conversation_id: int
+    conversation_id: str
     message: str
 
 class ChatResponse(BaseModel):
     message: str
-    conversation_id: int
+    conversation_id: str

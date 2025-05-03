@@ -1,14 +1,8 @@
 import uvicorn
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.orm import Session
 
-from app.database import engine, Base
 from app.routers import auth, conversations, gods
-from app.dependencies import get_db
-
-# Create database tables
-Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="God Talk API",

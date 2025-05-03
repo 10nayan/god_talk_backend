@@ -1,62 +1,46 @@
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Text, DateTime, JSON
-from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
+"""
+This project now uses MongoDB via Motor. Collections are accessed directly in the code.
 
-from app.database import Base
+Example God document structure:
+{
+    _id: ObjectId,
+    name: str,
+    description: str,
+    system_prompt: str,
+    example_phrases: list,
+    interaction_style: str,
+    personality_traits: list,
+    image_url: str,
+    religion: str,
+    created_at: datetime
+}
 
-class User(Base):
-    __tablename__ = "users"
+Example User document structure:
+{
+    _id: ObjectId,
+    username: str,
+    email: str,
+    hashed_password: str,
+    is_active: bool,
+    created_at: datetime
+}
 
-    id = Column(Integer, primary_key=True, index=True)
-    username = Column(String, unique=True, index=True)
-    email = Column(String, unique=True, index=True)
-    hashed_password = Column(String)
-    is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    
-    # Relationships
-    conversations = relationship("Conversation", back_populates="user")
+Example Conversation document structure:
+{
+    _id: ObjectId,
+    title: str,
+    user_id: ObjectId,      # Reference to User._id
+    god_id: ObjectId,       # Reference to God._id
+    created_at: datetime,
+    updated_at: datetime
+}
 
-class God(Base):
-    __tablename__ = "gods"
-
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, unique=True, index=True)
-    description = Column(Text)
-    system_prompt = Column(Text)
-    example_phrases = Column(JSON)
-    interaction_style = Column(String)
-    personality_traits = Column(JSON)
-    image_url = Column(String, nullable=True)
-    religion = Column(String, nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    
-    # Relationships
-    conversations = relationship("Conversation", back_populates="god")
-
-class Conversation(Base):
-    __tablename__ = "conversations"
-
-    id = Column(Integer, primary_key=True, index=True)
-    title = Column(String)
-    user_id = Column(Integer, ForeignKey("users.id"))
-    god_id = Column(Integer, ForeignKey("gods.id"))
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
-    # Relationships
-    user = relationship("User", back_populates="conversations")
-    god = relationship("God", back_populates="conversations")
-    messages = relationship("Message", back_populates="conversation", cascade="all, delete-orphan")
-
-class Message(Base):
-    __tablename__ = "messages"
-
-    id = Column(Integer, primary_key=True, index=True)
-    conversation_id = Column(Integer, ForeignKey("conversations.id"))
-    content = Column(Text)
-    is_from_user = Column(Boolean, default=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    
-    # Relationships
-    conversation = relationship("Conversation", back_populates="messages")
+Example Message document structure:
+{
+    _id: ObjectId,
+    conversation_id: ObjectId,  # Reference to Conversation._id
+    content: str,
+    is_from_user: bool,
+    created_at: datetime
+}
+"""

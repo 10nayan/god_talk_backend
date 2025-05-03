@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     
     # Database settings
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./god_talk.db")
+    MONGODB_URI: str = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
     
     # OpenAI API settings
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")

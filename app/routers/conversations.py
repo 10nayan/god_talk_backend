@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
-from sqlalchemy import func
 from typing import List
+from bson import ObjectId
+from datetime import datetime
 
-from app.dependencies import get_db, get_current_active_user
-from app.models import Conversation, Message, God, User
+from app.database import get_database
 from app.schemas import Conversation as ConversationSchema, ConversationCreate, Message as MessageSchema, ChatRequest, ChatResponse
+from app.dependencies import get_current_active_user
 from app.services.openai_service import OpenAIService
 
 router = APIRouter(
@@ -14,131 +14,148 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 
+# Helpers to convert MongoDB docs to schemas
+def conversation_doc_to_schema(doc, messages=None, god=None):
+    if not doc:
+        return None
+    return ConversationSchema(
+        id=str(doc["_id"]),
+        title=doc["title"],
+        user_id=str(doc["user_id"]),
+        god_id=str(doc["god_id"]),
+        created_at=doc.get("created_at", datetime.utcnow()),
+        updated_at=doc.get("updated_at"),
+        messages=messages or [],
+        god=god,
+    )
+
+def message_doc_to_schema(doc):
+    if not doc:
+        return None
+    return MessageSchema(
+        id=str(doc["_id"]),
+        conversation_id=str(doc["conversation_id"]),
+        content=doc["content"],
+        is_from_user=doc.get("is_from_user", True),
+        created_at=doc.get("created_at", datetime.utcnow()),
+    )
+
 @router.post("/", response_model=ConversationSchema)
 async def create_conversation(
-    conversation: ConversationCreate, 
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    conversation: ConversationCreate,
+    db=Depends(get_database),
+    current_user=Depends(get_current_active_user)
 ):
-    # Check if the god exists
-    god = db.query(God).filter(God.id == conversation.god_id).first()
+    god = await db["gods"].find_one({"_id": ObjectId(conversation.god_id)})
     if not god:
         raise HTTPException(status_code=404, detail="God not found")
-    
-    # Create new conversation
-    db_conversation = Conversation(
-        title=conversation.title,
-        user_id=current_user.id,
-        god_id=conversation.god_id
-    )
-    db.add(db_conversation)
-    db.commit()
-    db.refresh(db_conversation)
-    return db_conversation
+    conv_doc = {
+        "title": conversation.title,
+        "user_id": ObjectId(current_user.id),
+        "god_id": ObjectId(conversation.god_id),
+        "created_at": datetime.utcnow(),
+        "updated_at": datetime.utcnow(),
+    }
+    result = await db["conversations"].insert_one(conv_doc)
+    new_conv = await db["conversations"].find_one({"_id": result.inserted_id})
+    return conversation_doc_to_schema(new_conv)
 
 @router.get("/", response_model=List[ConversationSchema])
 async def get_conversations(
-    skip: int = 0, 
-    limit: int = 100, 
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    skip: int = 0,
+    limit: int = 100,
+    db=Depends(get_database),
+    current_user=Depends(get_current_active_user)
 ):
-    conversations = db.query(Conversation).filter(
-        Conversation.user_id == current_user.id
-    ).offset(skip).limit(limit).all()
+    cursor = db["conversations"].find({"user_id": ObjectId(current_user.id)}).skip(skip).limit(limit)
+    conversations = [conversation_doc_to_schema(doc) async for doc in cursor]
     return conversations
 
 @router.get("/{conversation_id}", response_model=ConversationSchema)
 async def get_conversation(
-    conversation_id: int, 
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    conversation_id: str,
+    db=Depends(get_database),
+    current_user=Depends(get_current_active_user)
 ):
-    conversation = db.query(Conversation).filter(
-        Conversation.id == conversation_id,
-        Conversation.user_id == current_user.id
-    ).first()
-    
-    if conversation is None:
+    try:
+        oid = ObjectId(conversation_id)
+    except Exception:
         raise HTTPException(status_code=404, detail="Conversation not found")
-    
-    return conversation
+    conv_doc = await db["conversations"].find_one({"_id": oid, "user_id": ObjectId(current_user.id)})
+    if not conv_doc:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    # Get messages
+    msg_cursor = db["messages"].find({"conversation_id": oid}).sort("created_at", 1)
+    messages = [message_doc_to_schema(doc) async for doc in msg_cursor]
+    # Get god
+    god_doc = await db["gods"].find_one({"_id": conv_doc["god_id"]})
+    god = None
+    if god_doc:
+        from app.routers.gods import god_doc_to_schema
+        god = god_doc_to_schema(god_doc)
+    return conversation_doc_to_schema(conv_doc, messages=messages, god=god)
 
 @router.delete("/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_conversation(
-    conversation_id: int, 
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    conversation_id: str,
+    db=Depends(get_database),
+    current_user=Depends(get_current_active_user)
 ):
-    conversation = db.query(Conversation).filter(
-        Conversation.id == conversation_id,
-        Conversation.user_id == current_user.id
-    ).first()
-    
-    if conversation is None:
+    try:
+        oid = ObjectId(conversation_id)
+    except Exception:
         raise HTTPException(status_code=404, detail="Conversation not found")
-    
-    db.delete(conversation)
-    db.commit()
+    result = await db["conversations"].delete_one({"_id": oid, "user_id": ObjectId(current_user.id)})
+    await db["messages"].delete_many({"conversation_id": oid})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Conversation not found")
     return None
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat_with_god(
     chat_request: ChatRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    db=Depends(get_database),
+    current_user=Depends(get_current_active_user)
 ):
-    # Get the conversation
-    conversation = db.query(Conversation).filter(
-        Conversation.id == chat_request.conversation_id,
-        Conversation.user_id == current_user.id
-    ).first()
-    
-    if conversation is None:
+    try:
+        conv_oid = ObjectId(chat_request.conversation_id)
+    except Exception:
         raise HTTPException(status_code=404, detail="Conversation not found")
-    
-    # Get the god
-    god = db.query(God).filter(God.id == conversation.god_id).first()
-    if god is None:
+    conversation = await db["conversations"].find_one({"_id": conv_oid, "user_id": ObjectId(current_user.id)})
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    god = await db["gods"].find_one({"_id": conversation["god_id"]})
+    if not god:
         raise HTTPException(status_code=404, detail="God not found")
-    
     # Save the user message
-    user_message = Message(
-        conversation_id=conversation.id,
-        content=chat_request.message,
-        is_from_user=True
-    )
-    db.add(user_message)
-    db.commit()
-    
+    user_message_doc = {
+        "conversation_id": conv_oid,
+        "content": chat_request.message,
+        "is_from_user": True,
+        "created_at": datetime.utcnow(),
+    }
+    await db["messages"].insert_one(user_message_doc)
     # Get conversation history
-    messages = db.query(Message).filter(
-        Message.conversation_id == conversation.id
-    ).order_by(Message.created_at).all()
-    
+    msg_cursor = db["messages"].find({"conversation_id": conv_oid}).sort("created_at", 1)
+    messages = [message_doc_to_schema(doc) async for doc in msg_cursor]
     # Format messages for OpenAI
     formatted_messages = OpenAIService.format_conversation_history(messages)
-    
     # Generate response from OpenAI
     response_text = await OpenAIService.generate_response(
         messages=formatted_messages,
-        system_prompt=god.system_prompt
+        system_prompt=god.get("system_prompt", "")
     )
-    
     # Save the god's response
-    god_message = Message(
-        conversation_id=conversation.id,
-        content=response_text,
-        is_from_user=False
-    )
-    db.add(god_message)
-    db.commit()
-    
+    god_message_doc = {
+        "conversation_id": conv_oid,
+        "content": response_text,
+        "is_from_user": False,
+        "created_at": datetime.utcnow(),
+    }
+    await db["messages"].insert_one(god_message_doc)
     # Update conversation's updated_at timestamp
-    conversation.updated_at = func.now()
-    db.commit()
-    
+    await db["conversations"].update_one({"_id": conv_oid}, {"$set": {"updated_at": datetime.utcnow()}})
     return ChatResponse(
         message=response_text,
-        conversation_id=conversation.id
+        conversation_id=str(conv_oid)
     )

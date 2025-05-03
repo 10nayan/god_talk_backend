@@ -1,13 +1,11 @@
 import asyncio
-from sqlalchemy.orm import Session
-from app.database import SessionLocal, engine, Base
-from app.models import God
+from motor.motor_asyncio import AsyncIOMotorClient
+from datetime import datetime
+from app.config import settings
 
-# Drop all tables and recreate them
-Base.metadata.drop_all(bind=engine)
-Base.metadata.create_all(bind=engine)
+MONGODB_URI = settings.MONGODB_URI
+DB_NAME = "god_talk"
 
-# Predefined gods with their system prompts
 GODS = [
     {
         "name": "Zeus",
@@ -131,25 +129,14 @@ GODS = [
     }
 ]
 
-
 async def init_db():
-    db = SessionLocal()
-    try:
-        # Check if gods already exist
-        existing_gods = db.query(God).all()
-        if existing_gods:
-            print("Database already initialized with gods.")
-            return
-        
-        # Add gods to database
-        for god_data in GODS:
-            god = God(**god_data)
-            db.add(god)
-        
-        db.commit()
-        print("Database initialized with predefined gods.")
-    finally:
-        db.close()
+    client = AsyncIOMotorClient(MONGODB_URI)
+    db = client[DB_NAME]
+    # Optionally clear existing gods
+    await db["gods"].delete_many({})
+    # Insert new gods
+    await db["gods"].insert_many(GODS)
+    print("Database initialized with predefined gods.")
 
 if __name__ == "__main__":
     asyncio.run(init_db())
