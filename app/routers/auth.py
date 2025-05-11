@@ -3,11 +3,15 @@ from fastapi.security import OAuth2PasswordRequestForm
 from datetime import datetime, timedelta
 from passlib.context import CryptContext
 from bson import ObjectId
+import pytz
 
 from app.database import get_database
 from app.schemas import Token, UserCreate, User as UserSchema
 from app.config import settings
 from app.dependencies import create_access_token
+
+# Set timezone to IST
+IST = pytz.timezone('Asia/Kolkata')
 
 router = APIRouter(
     prefix="/auth",
@@ -36,12 +40,19 @@ async def authenticate_user(db, username: str, password: str):
 def user_doc_to_schema(doc):
     if not doc:
         return None
+    
+    # Convert UTC to IST for API response
+    created_at = doc.get("created_at", datetime.utcnow())
+    if created_at.tzinfo is None:
+        created_at = pytz.utc.localize(created_at)
+    created_at_ist = created_at.astimezone(IST)
+    
     return UserSchema(
         id=str(doc["_id"]),
         username=doc["username"],
         email=doc["email"],
         is_active=doc.get("is_active", True),
-        created_at=doc.get("created_at", datetime.utcnow()),
+        created_at=created_at_ist,
     )
 
 @router.post("/register", response_model=UserSchema)
@@ -64,7 +75,7 @@ async def register_user(user: UserCreate, db=Depends(get_database)):
         "email": user.email,
         "hashed_password": hashed_password,
         "is_active": True,
-        "created_at": datetime.utcnow(),
+        "created_at": datetime.utcnow(),  # Store UTC in database
     }
     result = await db["users"].insert_one(user_doc)
     new_user = await db["users"].find_one({"_id": result.inserted_id})

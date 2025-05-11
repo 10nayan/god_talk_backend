@@ -2,10 +2,14 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List
 from bson import ObjectId
 from datetime import datetime
+import pytz
 
 from app.database import get_database
 from app.schemas import God as GodSchema, GodCreate
 from app.dependencies import get_current_active_user
+
+# Set timezone to IST
+IST = pytz.timezone('Asia/Kolkata')
 
 router = APIRouter(
     prefix="/gods",
@@ -17,6 +21,13 @@ router = APIRouter(
 def god_doc_to_schema(doc):
     if not doc:
         return None
+    
+    # Convert UTC to IST for API response
+    created_at = doc.get("created_at", datetime.utcnow())
+    if created_at.tzinfo is None:
+        created_at = pytz.utc.localize(created_at)
+    created_at_ist = created_at.astimezone(IST)
+    
     return GodSchema(
         id=str(doc["_id"]),
         name=doc["name"],
@@ -27,7 +38,7 @@ def god_doc_to_schema(doc):
         personality_traits=doc.get("personality_traits", []),
         image_url=doc.get("image_url"),
         religion=doc["religion"],
-        created_at=doc.get("created_at", datetime.utcnow()),
+        created_at=created_at_ist,
     )
 
 @router.post("/", response_model=GodSchema)
@@ -44,6 +55,7 @@ async def create_god(
             detail="God with this name already exists"
         )
     god_doc = god.dict()
+    # Store UTC time in database
     god_doc["created_at"] = datetime.utcnow()
     result = await db["gods"].insert_one(god_doc)
     new_god = await db["gods"].find_one({"_id": result.inserted_id})

@@ -2,11 +2,15 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List
 from bson import ObjectId
 from datetime import datetime
+import pytz
 
 from app.database import get_database
 from app.schemas import Conversation as ConversationSchema, ConversationCreate, Message as MessageSchema, ChatRequest, ChatResponse
 from app.dependencies import get_current_active_user
 from app.services.openai_service import OpenAIService
+
+# Set timezone to IST
+IST = pytz.timezone('Asia/Kolkata')
 
 router = APIRouter(
     prefix="/conversations",
@@ -18,13 +22,26 @@ router = APIRouter(
 def conversation_doc_to_schema(doc, messages=None, god=None):
     if not doc:
         return None
+    
+    # Convert UTC to IST for API response
+    created_at = doc.get("created_at", datetime.utcnow())
+    if created_at.tzinfo is None:
+        created_at = pytz.utc.localize(created_at)
+    created_at_ist = created_at.astimezone(IST)
+    
+    updated_at = doc.get("updated_at")
+    if updated_at:
+        if updated_at.tzinfo is None:
+            updated_at = pytz.utc.localize(updated_at)
+        updated_at = updated_at.astimezone(IST)
+    
     return ConversationSchema(
         id=str(doc["_id"]),
         title=doc["title"],
         user_id=str(doc["user_id"]),
         god_id=str(doc["god_id"]),
-        created_at=doc.get("created_at", datetime.utcnow()),
-        updated_at=doc.get("updated_at"),
+        created_at=created_at_ist,
+        updated_at=updated_at,
         messages=messages or [],
         god=god,
     )
@@ -32,12 +49,19 @@ def conversation_doc_to_schema(doc, messages=None, god=None):
 def message_doc_to_schema(doc):
     if not doc:
         return None
+    
+    # Convert UTC to IST for API response
+    created_at = doc.get("created_at", datetime.utcnow())
+    if created_at.tzinfo is None:
+        created_at = pytz.utc.localize(created_at)
+    created_at_ist = created_at.astimezone(IST)
+    
     return MessageSchema(
         id=str(doc["_id"]),
         conversation_id=str(doc["conversation_id"]),
         content=doc["content"],
         is_from_user=doc.get("is_from_user", True),
-        created_at=doc.get("created_at", datetime.utcnow()),
+        created_at=created_at_ist,
     )
 
 @router.get("/find/{god_id}", response_model=ConversationSchema)
