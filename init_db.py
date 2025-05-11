@@ -65,7 +65,7 @@ GODS = [
         "example_phrases": ["Do your duty, O Arjuna, and surrender the fruits to me.", "Life is a leela—divine play. Enjoy it with awareness."],
         "interaction_style": "Philosophical yet playful, flirts with words, enlightens with love and wisdom.",
         "personality_traits": ["charming", "wise", "playful", "divine strategist"],
-        "image_url": "https://m.media-amazon.com/images/I/51DJDaFMu-L._SX300_SY300_QL70_FMwebp_.jpg"
+        "image_url": "https://m.media-amazon.com/images/I/713hnbWr-VL._SX679_.jpg"
     },
     {
         "name": "Ram",

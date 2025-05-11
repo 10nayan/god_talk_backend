@@ -40,25 +40,106 @@ def message_doc_to_schema(doc):
         created_at=doc.get("created_at", datetime.utcnow()),
     )
 
+@router.get("/find/{god_id}", response_model=ConversationSchema)
+async def find_conversation_with_god(
+    god_id: str,
+    db=Depends(get_database),
+    current_user=Depends(get_current_active_user)
+):
+    """Find an existing conversation with a specific god."""
+    try:
+        god_oid = ObjectId(god_id)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Invalid god ID")
+
+    # Find the most recent conversation with this god
+    conversation = await db["conversations"].find_one({
+        "user_id": ObjectId(current_user.id),
+        "god_id": god_oid
+    }, sort=[("updated_at", -1)])
+
+    if not conversation:
+        raise HTTPException(status_code=404, detail="No conversation found with this god")
+
+    # Get the god details
+    god = await db["gods"].find_one({"_id": god_oid})
+    if not god:
+        raise HTTPException(status_code=404, detail="God not found")
+
+    return conversation_doc_to_schema(conversation, god=god)
+
 @router.post("/", response_model=ConversationSchema)
 async def create_conversation(
     conversation: ConversationCreate,
     db=Depends(get_database),
     current_user=Depends(get_current_active_user)
 ):
-    god = await db["gods"].find_one({"_id": ObjectId(conversation.god_id)})
-    if not god:
-        raise HTTPException(status_code=404, detail="God not found")
-    conv_doc = {
-        "title": conversation.title,
-        "user_id": ObjectId(current_user.id),
-        "god_id": ObjectId(conversation.god_id),
-        "created_at": datetime.utcnow(),
-        "updated_at": datetime.utcnow(),
-    }
-    result = await db["conversations"].insert_one(conv_doc)
-    new_conv = await db["conversations"].find_one({"_id": result.inserted_id})
-    return conversation_doc_to_schema(new_conv)
+    """Create a new conversation with a god if one doesn't exist."""
+    try:
+        # Validate god_id format
+        try:
+            god_oid = ObjectId(conversation.god_id)
+        except Exception as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid god ID format: {str(e)}"
+            )
+
+        # Check if god exists
+        god = await db["gods"].find_one({"_id": god_oid})
+        if not god:
+            raise HTTPException(
+                status_code=404,
+                detail=f"God with ID {conversation.god_id} not found"
+            )
+
+        # Check if conversation already exists
+        existing_conv = await db["conversations"].find_one({
+            "user_id": ObjectId(current_user.id),
+            "god_id": god_oid
+        })
+
+        if existing_conv:
+            # Return existing conversation with god details
+            from app.routers.gods import god_doc_to_schema
+            god_schema = god_doc_to_schema(god)
+            return conversation_doc_to_schema(existing_conv, god=god_schema)
+
+        # Create new conversation
+        conv_doc = {
+            "title": conversation.title,
+            "user_id": ObjectId(current_user.id),
+            "god_id": god_oid,
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow(),
+        }
+        
+        result = await db["conversations"].insert_one(conv_doc)
+        if not result.inserted_id:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to create conversation"
+            )
+
+        new_conv = await db["conversations"].find_one({"_id": result.inserted_id})
+        if not new_conv:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to retrieve created conversation"
+            )
+
+        # Convert god to schema
+        from app.routers.gods import god_doc_to_schema
+        god_schema = god_doc_to_schema(god)
+        return conversation_doc_to_schema(new_conv, god=god_schema)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error: {str(e)}"
+        )
 
 @router.get("/", response_model=List[ConversationSchema])
 async def get_conversations(
@@ -68,18 +149,24 @@ async def get_conversations(
     current_user=Depends(get_current_active_user)
 ):
     # Get all conversations for the user
-    cursor = db["conversations"].find({"user_id": ObjectId(current_user.id)}).skip(skip).limit(limit)
+    cursor = db["conversations"].find({"user_id": ObjectId(current_user.id)}).sort("updated_at", -1).skip(skip).limit(limit)
     conversations = [doc async for doc in cursor]
-
-    # Filter: Only include conversations that have at least one message
-    filtered_conversations = []
+    
+    # Filter conversations that have at least one message and get god details
+    result = []
     for conv in conversations:
+        # Check if conversation has any messages
         msg_count = await db["messages"].count_documents({"conversation_id": conv["_id"]})
         if msg_count > 0:
-            filtered_conversations.append(conv)
-
-    # Convert to schema
-    return [conversation_doc_to_schema(doc) for doc in filtered_conversations]
+            god = await db["gods"].find_one({"_id": conv["god_id"]})
+            if god:
+                from app.routers.gods import god_doc_to_schema
+                god_schema = god_doc_to_schema(god)
+                result.append(conversation_doc_to_schema(conv, god=god_schema))
+            else:
+                result.append(conversation_doc_to_schema(conv))
+    
+    return result
 
 @router.get("/{conversation_id}", response_model=ConversationSchema)
 async def get_conversation(

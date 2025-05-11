@@ -29,8 +29,8 @@ class OpenAIService:
             response = await client.chat.completions.create(
                 model=settings.OPENAI_MODEL,
                 messages=full_messages,
-                max_tokens=1000,
-                temperature=0.7,
+                max_tokens=500,
+                temperature=0.8,
             )
             
             # Extract and return the generated text
