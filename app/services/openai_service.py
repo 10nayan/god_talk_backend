@@ -44,6 +44,7 @@ class OpenAIService:
     def format_conversation_history(messages: List[Any]) -> List[Dict[str, str]]:
         """
         Format the conversation history into the format expected by the OpenAI API.
+        Limits the history to the last 5 messages to optimize token usage and maintain context.
         
         Args:
             messages: List of Message objects from the database
@@ -51,9 +52,11 @@ class OpenAIService:
         Returns:
             List of message dictionaries with 'role' and 'content'
         """
-        formatted_messages = []
+        # Take only the last 5 messages
+        recent_messages = messages[-5:] if len(messages) > 5 else messages
         
-        for message in messages:
+        formatted_messages = []
+        for message in recent_messages:
             role = "user" if message.is_from_user else "assistant"
             formatted_messages.append({
                 "role": role,
