@@ -90,3 +90,10 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     message: str
     conversation_id: str
+
+class Question(BaseModel):
+    id: str
+    question: str
+    god_id: str
+    created_at: datetime
+    updated_at: Optional[datetime] = None

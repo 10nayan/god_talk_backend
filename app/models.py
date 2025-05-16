@@ -43,4 +43,13 @@ Example Message document structure:
     is_from_user: bool,
     created_at: datetime
 }
+
+Example Question document structure:
+{
+    _id: ObjectId,
+    question: str,           # The question text
+    god_id: ObjectId        # Reference to God._id
+    created_at: datetime,
+    updated_at: datetime
+}
 """
