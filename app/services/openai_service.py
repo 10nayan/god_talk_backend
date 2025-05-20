@@ -29,7 +29,7 @@ class OpenAIService:
             response = await client.chat.completions.create(
                 model=settings.OPENAI_MODEL,
                 messages=full_messages,
-                max_tokens=500,
+                max_tokens=750,
                 temperature=0.8,
             )
             
