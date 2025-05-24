@@ -57,7 +57,7 @@ class MessageCreate(MessageBase):
 
 class Message(MessageBase):
     id: str
-    conversation_id: str
+    conversation_id: Optional[str] = None
     created_at: datetime
 
     class Config:
@@ -69,15 +69,16 @@ class ConversationBase(BaseModel):
     god_id: str
 
 class ConversationCreate(ConversationBase):
-    pass
+    is_guest: bool = False
 
 class Conversation(ConversationBase):
     id: str
-    user_id: str
+    user_id: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
     messages: List[Message] = []
     god: Optional[God] = None
+    is_guest: bool = False
 
     class Config:
         orm_mode = True

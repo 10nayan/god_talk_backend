@@ -6,7 +6,7 @@ import pytz
 
 from app.database import get_database
 from app.schemas import God as GodSchema, GodCreate
-from app.dependencies import get_current_active_user
+from app.dependencies import get_current_active_user, get_current_user_optional
 
 # Set timezone to IST
 IST = pytz.timezone('Asia/Kolkata')
@@ -66,7 +66,7 @@ async def get_gods(
     skip: int = 0,
     limit: int = 100,
     db=Depends(get_database),
-    current_user=Depends(get_current_active_user)
+    current_user=Depends(get_current_user_optional)
 ):
     cursor = db["gods"].find().skip(skip).limit(limit)
     gods = [god_doc_to_schema(doc) async for doc in cursor]
@@ -76,7 +76,7 @@ async def get_gods(
 async def get_god(
     god_id: str,
     db=Depends(get_database),
-    current_user=Depends(get_current_active_user)
+    current_user=Depends(get_current_user_optional)
 ):
     try:
         oid = ObjectId(god_id)

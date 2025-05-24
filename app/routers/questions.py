@@ -6,7 +6,7 @@ import pytz
 
 from app.database import get_database
 from app.schemas import Question as QuestionSchema
-from app.dependencies import get_current_active_user
+from app.dependencies import get_current_user_optional
 
 # Set timezone to IST
 IST = pytz.timezone('Asia/Kolkata')
@@ -46,7 +46,7 @@ def question_doc_to_schema(doc):
 async def get_questions_for_god(
     god_id: str,
     db=Depends(get_database),
-    current_user=Depends(get_current_active_user)
+    current_user=Depends(get_current_user_optional)
 ):
     """Get all questions for a specific god."""
     try:
