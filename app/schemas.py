@@ -1,5 +1,5 @@
 from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from datetime import datetime
 
 # Token schemas
@@ -97,3 +97,21 @@ class Question(BaseModel):
     god_id: str
     created_at: datetime
     updated_at: Optional[datetime] = None
+
+# Feedback schemas
+class FeedbackBase(BaseModel):
+    rating: float = Field(ge=0.0, le=5.0, description="Rating from 0.0 to 5.0 with one decimal place")
+    likes: Optional[str] = None
+    dislikes: Optional[str] = None
+
+class FeedbackCreate(FeedbackBase):
+    pass
+
+class Feedback(FeedbackBase):
+    id: str
+    user_id: str
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        orm_mode = True
