@@ -109,7 +109,7 @@ class FeedbackCreate(FeedbackBase):
 
 class Feedback(FeedbackBase):
     id: str
-    user_id: str
+    user_id: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
