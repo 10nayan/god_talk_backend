@@ -29,7 +29,7 @@ async def create_feedback(
     logger.info("Received feedback request")
     try:
         feedback_doc = {
-            "user_id": str(current_user.get("_id")) if current_user and current_user.get("_id") else None,
+            "user_id": str(current_user.id) if current_user and current_user.id else None,
             "rating": feedback.rating,
             "likes": feedback.likes,
             "dislikes": feedback.dislikes,
