@@ -25,13 +25,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers
+# Include routers with /api prefix
 logger.info("Including routers...")
-app.include_router(auth.router)
-app.include_router(gods.router)
-app.include_router(conversations.router)
-app.include_router(questions.router)
-app.include_router(feedback.router)
+app.include_router(auth.router, prefix="/api")
+app.include_router(gods.router, prefix="/api")
+app.include_router(conversations.router, prefix="/api")
+app.include_router(questions.router, prefix="/api")
+app.include_router(feedback.router, prefix="/api")
 logger.info("All routers included")
 
 @app.get("/")
